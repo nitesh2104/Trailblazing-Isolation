@@ -96,7 +96,7 @@ def minimaxTest(yourAgent, minimax_fn):
         for depth, exp_score in expected_depth_scores:
             move, score = minimax_fn(player, sample_board, time_left, depth=depth, my_turn=True)
             if exp_score != score:
-                print("Minimax failed for depth: ", depth)
+                print("Expected: Depth: {}, Score: {}".format(depth, exp_score))
                 test_pass = False
             else:
                 print("Minimax passed for depth: ", depth)
