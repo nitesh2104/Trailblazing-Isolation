@@ -65,6 +65,7 @@ class CustomPlayer:
     # TODO: finish this class!
     """Player that chooses a move using your evaluation function
     and a minimax algorithm with alpha-beta pruning.
+
     You must finish and test this player to make sure it properly
     uses minimax and alpha-beta to return a good move."""
 
@@ -110,46 +111,55 @@ class CustomPlayer:
         return self.name
 
 
-def minimax(player, game, time_left, depth, my_turn=True, current_depth=0, depth_dict={}, move=None):
-    depth_dict[current_depth] = {}
-    if current_depth == depth:
+def minimax(player, game, time_left, depth, my_turn=True, current_depth=0, move=None):
+    if current_depth == depth or not game.get_active_moves():
         return OpenMoveEvalFn().score(game, player)
 
+    # Get Current Moves of this game state
     current_moves = game.get_active_moves()
-    if not current_moves:
-        return OpenMoveEvalFn().score(game, player)
 
     if my_turn:
+        # First obtain the score for the current depth - in case if there is any timeout, we can return the value
+        curr_depth_score_min = float("-inf")
+        for moves in current_moves:
+            new_board, is_over, winner = game.forecast_move(moves)
+            this_board_score = OpenMoveEvalFn().score(new_board, player)
+            if this_board_score > curr_depth_score_min:
+                curr_depth_score_min = this_board_score
+                final_move = moves
+        # Otherwise keep creating the dfs tree if no timeout
         score_list = []
         for move in current_moves:
             new_board, is_over, winner = game.forecast_move(move)
-            ret_val = minimax(player, new_board, time_left, depth, False, current_depth + 1, depth_dict, move)
+            ret_val = minimax(player, new_board, time_left, depth, False, current_depth + 1, move)
             if type(ret_val) != int:
                 ret_val = ret_val[1]
             score_list.append((move, ret_val))
-            # depth_dict[current_depth][ret_val[0]] = ret_val[1]
-        try:
-            # Max value - reverse sort and return 0
             move, final_score = sorted(score_list, key=lambda x: x[1], reverse=True)[0]
-        except:
-            print("Error in maxi")
 
     else:
+        # For this depth level, get the min score - in case we run out of time
+        curr_depth_score = float("+inf")
+        for moves in current_moves:
+            new_board, is_over, winner = game.forecast_move(moves)
+            this_board_score = OpenMoveEvalFn().score(new_board, player)
+            if this_board_score < curr_depth_score:
+                curr_depth_score = this_board_score
+                final_move = moves
+
+        # Else go ahead and go to deeper levels
         score_list = []
         for move in current_moves:
             new_board, is_over, winner = game.forecast_move(move)
-            ret_val = minimax(player, new_board, time_left, depth, True, current_depth + 1, depth_dict, move)
+            ret_val = minimax(player, new_board, time_left, depth, True, current_depth + 1, move)
             if type(ret_val) != int:
                 ret_val = ret_val[1]
             score_list.append((move, ret_val))
-            # depth_dict[current_depth][ret_val[0]] = ret_val[1]
 
-            # Min value - sort and return 0
-            try:
-                move, final_score = sorted(score_list, key=lambda x: x[1], reverse=False)[0]
-            except:
-                print("Error in mini")
-
+            move, final_score = sorted(score_list, key=lambda x: x[1], reverse=False)[0]
+    # We are returning the move and final score - now if the minimax function needs it, it will strip out the move
+    # and will only take the final_score. But if in case, it it for the CustomPlayer() move, then the move will be
+    # sent back to the class
     return move, final_score
 
 
@@ -201,92 +211,111 @@ class CustomEvalFn:
 
 
 if __name__ == '__main__':
-    print("")
+    winnings = 0
+    losses = 0
+    errors_not_implemented = 0
+    errors_others = 0
+    games = 10
+    for i in range(0, games):
+        print("Playing the game: {} iteration".format(i))
+        print("")
+        try:
+            r = RandomPlayer()
+            p = CustomPlayer()
+            game = Board(r, p, 7, 7)
+            output_b = game.copy()
+            winner, move_history, termination = game.play_isolation(time_limit=10000, print_moves=True)
+            print("\n", winner, " has won. Reason: ", termination)
+            if "CustomPlayer" in winner:
+                winnings += 1
+            else:
+                losses += 1
+            # Uncomment to see game
+            # print(game_as_text(winner, move_history, termination, output_b))
+        except NotImplementedError:
+            print('CustomPlayer Test: Not Implemented')
+            errors_not_implemented += 1
+        except:
+            errors_others +=1
+            print('CustomPlayer Test: ERROR OCCURRED')
+            print(traceback.format_exc())
+
+
+    print("\n\n\n\n")
+    print("Total Games: {}".format(len(range(0, games))))
+    print("Winnings: {}".format(winnings))
+    print("Losses: {}".format(losses))
+    print("Not Implemented Errors: {}".format(errors_not_implemented))
+    print("Other Errors: {}".format(errors_others))
+
     try:
-        r = RandomPlayer()
-        p = CustomPlayer()
-        game = Board(r, p, 7, 7)
-        output_b = game.copy()
-        winner, move_history, termination = game.play_isolation(time_limit=100000, print_moves=True)
-        print("\n", winner, " has won. Reason: ", termination)
-        # Uncomment to see game
-        print(game_as_text(winner, move_history, termination, output_b))
+        def time_left():  # For these testing purposes, let's ignore timeouts
+            return 10000
+
+        if True:
+            player = CustomPlayer()  # using as a dummy player to create a board
+            sample_board = Board(player, RandomPlayer())
+            # setting up the board as though we've been playing
+            board_state = [
+                [" ", "X", "X", " ", "X", "X", " "],
+                [" ", " ", "X", " ", " ", "X", " "],
+                ["X", " ", " ", " ", " ", "Q1", " "],
+                [" ", "X", "X", "Q2", "X", " ", " "],
+                ["X", " ", "X", " ", " ", " ", " "],
+                [" ", " ", "X", " ", "X", " ", " "],
+                ["X", " ", "X", " ", " ", " ", " "]
+            ]
+            sample_board.set_state(board_state, True)
+
+            test_pass = True
+
+            expected_depth_scores = [(1, -2), (2, 1), (3, 4), (4, 3), (5, 5)]
+            # expected_depth_scores = [(1, -2), (2, 1), (3, 4)]
+
+            for depth, exp_score in expected_depth_scores:
+                move, score = minimax(player, sample_board, time_left, depth=depth, my_turn=True)
+                if exp_score != score:
+                    print("Expected: Depth: {}, Score: {}".format(depth, exp_score))
+                    test_pass = False
+                else:
+                    print("Minimax passed for depth: ", depth)
+
+        if True or test_pass:
+            player = CustomPlayer()
+            sample_board = Board(RandomPlayer(), player)
+            # setting up the board as though we've been playing
+            board_state = [
+                [" ", " ", " ", " ", "X", " ", "X"],
+                ["X", "X", "X", " ", "X", "Q2", " "],
+                [" ", "X", "X", " ", "X", " ", " "],
+                ["X", " ", "X", " ", "X", "X", " "],
+                ["X", " ", "Q1", " ", "X", " ", "X"],
+                [" ", " ", " ", " ", "X", "X", " "],
+                ["X", " ", " ", " ", " ", " ", " "]
+            ]
+            sample_board.set_state(board_state, p1_turn=True)
+
+            test_pass = True
+
+            expected_depth_scores = [(1, -7), (2, -7), (3, -7), (4, -9), (5, -8)]
+            # expected_depth_scores = [(1, -7), (2, -7)]
+
+            for depth, exp_score in expected_depth_scores:
+                move, score = minimax(player, sample_board, time_left, depth=depth, my_turn=False)
+                if exp_score != score:
+                    print("Minimax failed for depth: ", depth)
+                    test_pass = False
+                else:
+                    print("Minimax passed for depth: ", depth)
+
+        if test_pass:
+            print("Minimax Test: Runs Successfully!")
+
+        else:
+            print("Minimax Test: Failed")
+
     except NotImplementedError:
-        print('CustomPlayer Test: Not Implemented')
+        print('Minimax Test: Not implemented')
     except:
-        print('CustomPlayer Test: ERROR OCCURRED')
+        print('Minimax Test: ERROR OCCURRED')
         print(traceback.format_exc())
-
-    print()
-
-    # try:
-    #     def time_left():  # For these testing purposes, let's ignore timeouts
-    #         return 10000
-    #
-    #     if True:
-    #         player = CustomPlayer()  # using as a dummy player to create a board
-    #         sample_board = Board(player, RandomPlayer())
-    #         # setting up the board as though we've been playing
-    #         board_state = [
-    #             [" ", "X", "X", " ", "X", "X", " "],
-    #             [" ", " ", "X", " ", " ", "X", " "],
-    #             ["X", " ", " ", " ", " ", "Q1", " "],
-    #             [" ", "X", "X", "Q2", "X", " ", " "],
-    #             ["X", " ", "X", " ", " ", " ", " "],
-    #             [" ", " ", "X", " ", "X", " ", " "],
-    #             ["X", " ", "X", " ", " ", " ", " "]
-    #         ]
-    #         sample_board.set_state(board_state, True)
-    #
-    #         test_pass = True
-    #
-    #         expected_depth_scores = [(1, -2), (2, 1), (3, 4), (4, 3), (5, 5)]
-    #         # expected_depth_scores = [(1, -2), (2, 1), (3, 4)]
-    #
-    #         for depth, exp_score in expected_depth_scores:
-    #             move, score = minimax(player, sample_board, time_left, depth=depth, my_turn=True)
-    #             if exp_score != score:
-    #                 print("Expected: Depth: {}, Score: {}".format(depth, exp_score))
-    #                 test_pass = False
-    #             else:
-    #                 print("Minimax passed for depth: ", depth)
-    #
-    #     if True or test_pass:
-    #         player = CustomPlayer()
-    #         sample_board = Board(RandomPlayer(), player)
-    #         # setting up the board as though we've been playing
-    #         board_state = [
-    #             [" ", " ", " ", " ", "X", " ", "X"],
-    #             ["X", "X", "X", " ", "X", "Q2", " "],
-    #             [" ", "X", "X", " ", "X", " ", " "],
-    #             ["X", " ", "X", " ", "X", "X", " "],
-    #             ["X", " ", "Q1", " ", "X", " ", "X"],
-    #             [" ", " ", " ", " ", "X", "X", " "],
-    #             ["X", " ", " ", " ", " ", " ", " "]
-    #         ]
-    #         sample_board.set_state(board_state, p1_turn=True)
-    #
-    #         test_pass = True
-    #
-    #         expected_depth_scores = [(1, -7), (2, -7), (3, -7), (4, -9), (5, -8)]
-    #         # expected_depth_scores = [(1, -7), (2, -7)]
-    #
-    #         for depth, exp_score in expected_depth_scores:
-    #             move, score = minimax(player, sample_board, time_left, depth=depth, my_turn=False)
-    #             if exp_score != score:
-    #                 print("Minimax failed for depth: ", depth)
-    #                 test_pass = False
-    #             else:
-    #                 print("Minimax passed for depth: ", depth)
-    #
-    #     if test_pass:
-    #         print("Minimax Test: Runs Successfully!")
-    #
-    #     else:
-    #         print("Minimax Test: Failed")
-    #
-    # except NotImplementedError:
-    #     print('Minimax Test: Not implemented')
-    # except:
-    #     print('Minimax Test: ERROR OCCURRED')
-    #     print(traceback.format_exc())
