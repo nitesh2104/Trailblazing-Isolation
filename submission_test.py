@@ -100,7 +100,7 @@ class CustomPlayer:
         if not game.get_player_moves(self):
             return None
         else:
-            best_move, utility = minimax(self, game, time_left, depth=self.search_depth)
+            best_move, utility = alphabeta(self, game, time_left, depth=self.search_depth)
             return best_move
 
     def utility(self, game, my_turn):
@@ -163,8 +163,13 @@ def minimax(player, game, time_left, depth, my_turn=True, current_depth=0, move=
     return move, final_score
 
 
-def alphabeta(player, game, time_left, depth, alpha=float("-inf"), beta=float("inf"), my_turn=True):
-    """Implementation of the alphabeta algorithm.
+def alphabeta(player, game, time_left, depth, alpha=float("-inf"), beta=float("inf"), my_turn=True, current_depth=0):
+    """
+
+    Implementation of the alphabeta algorithm.
+
+    Alpha is for maximizer
+    Beta is for minimizer
 
     Args:
         player (CustomPlayer): This is the instantiation of CustomPlayer()
@@ -182,9 +187,43 @@ def alphabeta(player, game, time_left, depth, alpha=float("-inf"), beta=float("i
         (tuple, int): best_move, val
     """
 
-    # I dont have much idea on how to code the algorithm yet, however I will have a look at the textbook to get an idea
-    # TODO: finish this function!
-    raise NotImplementedError
+    if current_depth == depth or not game.get_active_moves():
+        return OpenMoveEvalFn().score(game, player)
+
+    # Get Current Moves of this game state
+    current_moves = game.get_active_moves()
+
+    if my_turn:
+        score_list = []
+        for move in current_moves:
+            new_board, is_over, winner = game.forecast_move(move)
+            ret_val = alphabeta(player, new_board, time_left, depth, alpha, beta, False, current_depth + 1)
+            if type(ret_val) != int:
+                ret_val = ret_val[1]
+            score_list.append((move, ret_val))
+            final_move, final_score = sorted(score_list, key=lambda x: x[1], reverse=True)[0]
+            if final_score >= beta:
+                break
+            alpha = max(alpha, final_score)
+
+    else:
+        # Else go ahead and go to deeper levels
+        score_list = []
+        for move in current_moves:
+            new_board, is_over, winner = game.forecast_move(move)
+            ret_val = alphabeta(player, new_board, time_left, depth, alpha, beta, True, current_depth + 1)
+            if type(ret_val) != int:
+                ret_val = ret_val[1]
+            score_list.append((move, ret_val))
+
+            final_move, final_score = sorted(score_list, key=lambda x: x[1], reverse=False)[0]
+            if final_score <= alpha:
+                break
+            beta = min(beta, final_score)
+    # We are returning the move and final score - now if the minimax function needs it, it will strip out the move
+    # and will only take the final_score. But if in case, it it for the CustomPlayer() move, then the move will be
+    # sent back to the class
+    return final_move, final_score
 
 
 class CustomEvalFn:
@@ -224,7 +263,7 @@ if __name__ == '__main__':
             p = CustomPlayer()
             game = Board(r, p, 7, 7)
             output_b = game.copy()
-            winner, move_history, termination = game.play_isolation(time_limit=10000, print_moves=True)
+            winner, move_history, termination = game.play_isolation(time_limit=1000, print_moves=True)
             print("\n", winner, " has won. Reason: ", termination)
             if "CustomPlayer" in winner:
                 winnings += 1
