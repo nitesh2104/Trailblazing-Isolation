@@ -122,6 +122,7 @@ class MiniMaxPlayer:
         """
         signal.signal(signal.SIGALRM, self.handler)
         signal.setitimer(0, ((time_left() / 1000) - 0.01), 0.01)
+        score_card = []
         if not game.get_player_moves(self):
             return None
         else:
@@ -131,10 +132,12 @@ class MiniMaxPlayer:
                 while time_left() - (int(round(time.time() * 1000)) - start_time):
                     for depth in range(2, 50):
                         best_move, score = minimax(self, game, time_left, depth=depth)
+                        score_card.append((best_move, score))
             except Exception:
                 signal.alarm(0)
                 # traceback.print_exc()
-                return best_move
+                final_move = sorted(score_card, key=lambda x: x[1], reverse=False)[0][0]
+                return final_move
 
     def utility(self, game, my_turn=None):
         """You can handle special cases here (e.g. endgame)"""
@@ -239,6 +242,7 @@ class AlphaBetaPlayer:
         """
         signal.signal(signal.SIGALRM, self.handler)
         signal.setitimer(0, ((time_left() / 1000) - 0.01), 0.01)
+        score_card = []
         if not game.get_player_moves(self):
             return None
         else:
@@ -248,10 +252,12 @@ class AlphaBetaPlayer:
                 while time_left() - (int(round(time.time() * 1000)) - start_time):
                     for depth in range(2, 50):
                         best_move, score = alphabeta(self, game, time_left, depth=depth)
+                        score_card.append((best_move, score))
             except Exception:
                 signal.alarm(0)
                 # traceback.print_exc()
-                return best_move
+                final_move = sorted(score_card, key=lambda x: x[1], reverse=False)[0][0]
+                return final_move
 
         # best_move, score = alphabeta(self, game, time_left, depth=self.search_depth)
         # return best_move
@@ -375,15 +381,15 @@ if __name__ == '__main__':
     errors_not_implemented = 0
     errors_others = 0
     others = 0
-    games = 3
+    games = 10
     for i in range(0, games):
         print("Playing the game: {} iteration".format(i))
         try:
             r = RandomPlayer()
             p = MiniMaxPlayer()
             q = AlphaBetaPlayer()
-            game = Board(q, p, 7, 7)
-            winner, move_history, termination = game.play_isolation(time_limit=1000, print_moves=False)
+            game = Board(p, q, 7, 7)
+            winner, move_history, termination = game.play_isolation(time_limit=1000, print_moves=True)
             print("\n", winner, " has won. Reason: ", termination)
             if "Q1" in winner:
                 winnings += 1
