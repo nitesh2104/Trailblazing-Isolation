@@ -27,8 +27,32 @@ class OpenMoveEvalFn:
         return len(active_player_moves) - len(inactive_player_moves)
 
 
-class MMPlayer:
-    def __init__(self, search_depth=3, eval_fn=OpenMoveEvalFn(), name="MMPlayer"):
+class CustomEvalFn:
+    def score(self, game, my_player=None):
+        active_player = game.get_active_player()
+        inactive_player = game.get_inactive_player()
+
+        active_player_moves = game.get_player_moves(active_player)
+        inactive_player_moves = game.get_player_moves(inactive_player)
+
+        if not active_player_moves and active_player == my_player:
+            # I lost
+            return len(active_player_moves) - 2 * len(inactive_player_moves)
+        elif not active_player_moves and active_player != my_player:
+            # I won
+            return 2 * len(active_player_moves) - len(inactive_player_moves)
+        elif not inactive_player_moves and active_player == my_player:
+            # I won
+            return 2 * len(active_player_moves) - len(inactive_player_moves)
+        elif not inactive_player_moves and active_player != my_player:
+            # I lost
+            return len(active_player_moves) - 2 * len(inactive_player_moves)
+
+        return len(active_player_moves) - len(inactive_player_moves)
+
+
+class ABPlayerO:
+    def __init__(self, search_depth=3, eval_fn=OpenMoveEvalFn(), name="ABPlayerO"):
         self.eval_fn = eval_fn
         self.search_depth = search_depth
         self.name = name
@@ -43,8 +67,8 @@ class MMPlayer:
             try:
                 start_time = int(round(time.time() * 1000))
                 while time_left() - (int(round(time.time() * 1000)) - start_time):
-                    for depth in range(2, 100):
-                        best_move, utility = minimax(self, game, time_left, depth=depth)
+                    for depth in range(2, 100, 2):
+                        best_move, utility = alphabeta(self, game, time_left, depth=depth)
             except Exception:
                 signal.alarm(0)
                 return best_move
@@ -82,32 +106,9 @@ def minimax(player, game, time_left, depth, my_turn=True, current_depth=0, depth
 
 ################################################
 
-class CustomEvalFn:
-    def score(self, game, my_player=None):
-        active_player = game.get_active_player()
-        inactive_player = game.get_inactive_player()
 
-        active_player_moves = game.get_player_moves(active_player)
-        inactive_player_moves = game.get_player_moves(inactive_player)
-
-        if not active_player_moves and active_player == my_player:
-            # I lost
-            return len(active_player_moves) - 2 * len(inactive_player_moves)
-        elif not active_player_moves and active_player != my_player:
-            # I won
-            return 2 * len(active_player_moves) - len(inactive_player_moves)
-        if not inactive_player_moves and active_player == my_player:
-            # I won
-            return 2 * len(active_player_moves) - len(inactive_player_moves)
-        if not inactive_player_moves and active_player != my_player:
-            # I lost
-            return len(active_player_moves) - 2 * len(inactive_player_moves)
-
-        return len(active_player_moves) - len(inactive_player_moves)
-
-
-class ABPlayer:
-    def __init__(self, search_depth=3, eval_fn=CustomEvalFn(), name="ABPlayer"):
+class ABPlayerN:
+    def __init__(self, search_depth=3, eval_fn=CustomEvalFn(), name="ABPlayerN"):
         self.eval_fn = eval_fn
         self.search_depth = search_depth
         self.name = name
@@ -140,14 +141,14 @@ class ABPlayer:
 
 
 def alphabeta(player, game, time_left, depth, alpha=float("-inf"), beta=float("inf"), my_turn=True, current_depth=0):
-    if current_depth == depth or not game.get_active_moves():
+    current_moves = game.get_active_moves()
+    if current_depth == depth or not current_moves:
         return OpenMoveEvalFn().score(game, player)
 
-    current_moves = game.get_active_moves()
     score_list = []
-    for move in current_moves:
-        new_board, is_over, winner = game.forecast_move(move)
-        if my_turn:
+    if my_turn:
+        for move in current_moves:
+            new_board, is_over, winner = game.forecast_move(move)
             ret_val = alphabeta(player, new_board, time_left, depth, alpha, beta, False, current_depth + 1)
             if type(ret_val) != int:
                 ret_val = ret_val[1]
@@ -156,8 +157,12 @@ def alphabeta(player, game, time_left, depth, alpha=float("-inf"), beta=float("i
             if final_score >= beta:
                 break
             alpha = max(alpha, final_score)
+        return final_move, final_score
 
-        else:
+    else:
+        current_moves = game.get_active_moves()
+        for move in current_moves:
+            new_board, is_over, winner = game.forecast_move(move)
             ret_val = alphabeta(player, new_board, time_left, depth, alpha, beta, True, current_depth + 1)
             if type(ret_val) != int:
                 ret_val = ret_val[1]
@@ -167,7 +172,7 @@ def alphabeta(player, game, time_left, depth, alpha=float("-inf"), beta=float("i
             if final_score <= alpha:
                 break
             beta = min(beta, final_score)
-    return final_move, final_score
+        return final_move, final_score
 
 
 ################################################
@@ -190,15 +195,15 @@ if __name__ == '__main__':
         print("Playing the game: {} iteration".format(i))
         try:
             p = RandomPlayer()
-            q = MMPlayer()
-            r = ABPlayer()
+            q = ABPlayerO()
+            r = ABPlayerN()
             c = [q, r]
             random.shuffle(c)
-            game = Board(r, q, 7, 7)
+            game = Board(c[0], c[1], 7, 7)
             output_b = game.copy()
             winner, move_history, termination = game.play_isolation(time_limit=1000, print_moves=False)
             print("\n", winner, " has won. Reason: ", termination)
-            if "ABPlayer" in winner:
+            if "ABPlayerN" in winner:
                 winnings += 1
             else:
                 losses += 1
@@ -215,8 +220,8 @@ if __name__ == '__main__':
 
     print("\n\n\n\n")
     print("Total Games: {}".format(len(range(0, games))))
-    print("Winnings ABPlayer: {}".format(winnings))
-    print("Winnings MMPlayer: {}".format(losses))
+    print("Winnings ABPlayerN: {}".format(winnings))
+    print("Winnings ABPlayerO: {}".format(losses))
     print("Not determined: {}".format(others))
     print("Not Implemented Errors: {}".format(errors_not_implemented))
     print("Other Errors: {}".format(errors_others))
